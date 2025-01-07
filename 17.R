@@ -178,3 +178,149 @@ for (a in (8^15):(8^16)) {
       break
     }
 }
+
+
+# Hmm bitwise xor doesn't go this big anyway :(
+# So let's build our own. I think in reality there are only one big number
+# in the mix, so can mod that to pull out the lower bits
+
+bxo <- function(a,b) {
+  bitwXor(a%%(2^31),b%%(2^31))
+}
+
+options(scipen=20)
+
+run2 <- function(a,b,c,prog, part2 = FALSE) {
+  ip <- 1
+  #ps <- c(adv,bxl,bst,NA,NA,out,NA,NA)
+  output <- numeric()
+  
+  combo <- function() {
+    op <- prog[ip + 1]
+    if (op == 0) return (0)
+    if (op == 1) return (1)
+    if (op == 2) return (2)
+    if (op == 3) return (3)
+    if (op == 4) return (a)
+    if (op == 5) return (b)
+    if (op == 6) return (c)
+  }
+  
+  while(ip < length(prog)) {
+    #if (ip == 1) print(c(a,b,c))
+    #print(paste(c("ip=",ip," exec",prog[ip+0:1]),collapse=" "))
+    
+    if (prog[ip] == 0) {  ## adv ##
+      a <- floor(a / (2^combo()))
+    } else if (prog[ip] == 1) {  ## bxl ##
+      b <- bxo(b,prog[ip+1])
+    } else if (prog[ip] == 2) {  ## bst ##
+      b <- combo() %% 8
+    } else if (prog[ip] == 3) {  ## jnz ##
+      if (a != 0) { ip <- prog[ip+1]-1 }
+    } else if (prog[ip] == 4) {  ## bxc ##
+      b <- bxo(b,c)
+    } else if (prog[ip] == 5) {  ## out ##
+      output <- c(output,combo()%%8)
+      if (part2) {
+        # if part2 = TRUE, returns T/F rather than output vector
+        # And in that case, can output FALSE as soon as the result *begins* to deviate = more efficent!
+        if(!identical(output, c(prog,-99)[1:length(output)]))
+          return(FALSE)
+      }
+    } else if (prog[ip] == 7) {  ## adv ##
+      c <- floor(a / (2^combo()))
+    } else{
+      message(paste0("invalid op: ip=", ip))
+      return()
+    }
+    ip <- ip + 2
+    #Sys.sleep(0.1)
+  }
+  #print("complete")
+  if (part2) 
+    return(identical(output, prog))
+  
+  return(output)
+}
+
+
+## Interesting.... the tail digits rarely change!
+for (a in (8^15):(8^16)) {
+  if(bxo(bxo(bxo(a%%8,1),4),a%/%(2^bxo(a%%8,1)))%%8 == 2)
+    if (run2(a, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0), part2=T)) {
+      print(a)
+      break
+    }
+}
+
+# Let's see how often the last 12 digits change...?
+a <- 8^15
+a2 <- a
+out2 <- 0
+while (TRUE) {
+  out <- run2(a, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0))[5:16]
+  if (!identical(out, out2)) {
+    print(c(a, a-a2))
+    a2 <- a
+  }
+          
+  out2 <- out
+  
+  a <- a + 1
+}
+
+# Interesting - the last 12 digits only change after every (a multiple of) 4096 values
+# Therefor if for example, the last 12 digits for out first candidate 8^15 aren't right, we can jump on another 4096 !
+
+
+a <- 8^15
+while (TRUE) {
+  if (identical(run2(a, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0))[5:16],
+                 c(7,5, 0,3, 1,4, 4,5, 5,5, 3,0)))
+    for (b in 0:4095)
+      if (run2(a+b, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0), part2=T)) {
+        print(a+b)
+        print(run2(a+b, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0)))
+        break
+      }
+  a <- a + 4096
+}
+
+
+
+## That was still slow - let's look at the last 11 digits... which it turns out change every 32768
+a <- 8^15
+a2 <- a
+out2 <- 0
+while (TRUE) {
+  out <- run2(a, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0))[6:16]
+  if (!identical(out, out2)) {
+    print(c(a, a-a2))
+    a2 <- a
+  }
+  
+  out2 <- out
+  
+  a <- a + 1
+}
+
+#Let's just assume this increases by 8 for each digit!
+a <- 8^15
+while (TRUE) {
+  if (identical(run2(a, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0))[9:16],
+                c(1,4, 4,5, 5,5, 3,0))) {
+    print(paste("try candidates at",a))
+    for (b in 0:(8^8-1))
+      if (run2(a+b, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0), part2=T)) {
+        print(a+b)
+        print(run2(a+b, 0, 0, c(2,4, 1,1, 7,5, 0,3, 1,4, 4,5, 5,5, 3,0)))
+        break
+      }
+  }
+  a <- a + 8^8
+}
+
+
+#AGH! Horrible, clunky solution - but that found the solution so hey...
+
